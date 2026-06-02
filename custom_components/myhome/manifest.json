@@ -2,13 +2,13 @@
   "domain": "myhome",
   "name": "MyHOME",
   "codeowners": [
-    "@anotherjulien"
+    "@mdelisi"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/anotherjulien/MyHOME",
+  "documentation": "https://github.com/mdelisi/MyHOME",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/anotherjulien/MyHOME/issues",
+  "issue_tracker": "https://github.com/mdelisi/MyHOME/issues",
   "requirements": [
     "OWNd==0.7.49"
   ],
