@@ -381,7 +381,6 @@ class MyhomeOptionsFlowHandler(OptionsFlow):
 
     def __init__(self, config_entry):
         """Initialize MyHome options flow."""
-        self.config_entry = config_entry
         self.options = dict(config_entry.options)
         self.data = dict(config_entry.data)
         if CONF_WORKER_COUNT not in self.options:
