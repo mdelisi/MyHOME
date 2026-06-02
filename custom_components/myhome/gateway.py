@@ -140,7 +140,14 @@ class MyHOMEGatewayHandler:
         self.is_connected = True
 
         while not self._terminate_listener:
-            message = await _event_session.get_next()
+            try:
+                message = await asyncio.wait_for(_event_session.get_next(), timeout=900)
+                if message is None: continue
+            except asyncio.TimeoutError:
+                LOGGER.warning("%s No bus traffic for 900s; reconnecting event session.", self.log_id)
+                await _event_session.close()
+                await _event_session.connect()
+                continue
             LOGGER.debug("%s Message received: `%s`", self.log_id, message)
 
             if self.generate_events:
