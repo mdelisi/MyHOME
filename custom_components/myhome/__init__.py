@@ -135,14 +135,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
 
     hass.data[DOMAIN][entry.data[CONF_MAC]][CONF_ENTITY].listening_worker = (
-        entry.async_create_background_task(hass,
-            hass.data[DOMAIN][entry.data[CONF_MAC]][CONF_ENTITY].listening_loop()
+        entry.async_create_background_task(
+            hass,
+            hass.data[DOMAIN][entry.data[CONF_MAC]][CONF_ENTITY].listening_loop(),
+            name=f"myhome_{entry.data[CONF_MAC]}_listener",
         )
     )
     for i in range(_command_worker_count):
         hass.data[DOMAIN][entry.data[CONF_MAC]][CONF_ENTITY].sending_workers.append(
-            entry.async_create_background_task(hass,
-                hass.data[DOMAIN][entry.data[CONF_MAC]][CONF_ENTITY].sending_loop(i)
+            entry.async_create_background_task(
+                hass,
+                hass.data[DOMAIN][entry.data[CONF_MAC]][CONF_ENTITY].sending_loop(i),
+                name=f"myhome_{entry.data[CONF_MAC]}_sender_{i}",
             )
         )
 
