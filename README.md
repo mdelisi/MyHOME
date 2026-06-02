@@ -1,6 +1,8 @@
 # MyHOME
 MyHOME integration for Home-Assistant
 
+Note: This is a modified version of the original Anotherjulien's integration that solves some issues after that integration went and of life.
+
 ## Installation
 The integration is able to install the gateway via the Home-Assistant graphical user interface, configuring the different devices needs to be done in YAML files however.
 
