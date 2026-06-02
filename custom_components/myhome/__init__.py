@@ -282,6 +282,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     hass.services.async_register(DOMAIN, "send_message", handle_send_message)
 
+    entry.async_on_unload(
+        entry.add_update_listener(
+            lambda hass, entry: hass.config_entries.async_reload(entry.entry_id)
+        )
+    )
+    
     return True
 
 
