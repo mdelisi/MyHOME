@@ -172,114 +172,132 @@ class BusInterface(object):
         return "BusInterface(%s, msg=%r)" % ("String", self.msg)
 
 
-class MyHomeConfigSchema(Schema):
-    def __call__(self, data):
-        data = super().__call__(data)
-        _rekeyed_data = {}
-        for gateway in data:
-            _rekeyed_data[data[gateway][CONF_MAC]] = {}
-            _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS] = {}
-            for platform in data[gateway]:
-                if platform != CONF_MAC:
-                    _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][platform] = data[gateway][platform]
+def _rekey_config(data):
+    """Post-process validated data (run via All(), not a Schema.__call__ override)."""
+    _rekeyed_data = {}
+    for gateway in data:
+        _rekeyed_data[data[gateway][CONF_MAC]] = {}
+        _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS] = {}
+        for platform in data[gateway]:
+            if platform != CONF_MAC:
+                _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][platform] = data[gateway][platform]
 
-            if (
-                (LIGHT in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS])
-                or (SWITCH in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS])
-                or (COVER in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS])
-            ):
-                _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON] = {}
-                if LIGHT in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS]:
-                    for key, value in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][LIGHT].items():
-                        if not value[CONF_WHERE].startswith("#"):
-                            _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON][key] = value
-                if SWITCH in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS]:
-                    for key, value in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][SWITCH].items():
-                        if not value[CONF_WHERE].startswith("#"):
-                            _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON][key] = value
-                if COVER in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS]:
-                    for key, value in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][COVER].items():
-                        if not value[CONF_WHERE].startswith("#"):
-                            _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON][key] = value
+        if (
+            (LIGHT in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS])
+            or (SWITCH in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS])
+            or (COVER in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS])
+        ):
+            _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON] = {}
+            if LIGHT in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS]:
+                for key, value in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][LIGHT].items():
+                    if not value[CONF_WHERE].startswith("#"):
+                        _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON][key] = value
+            if SWITCH in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS]:
+                for key, value in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][SWITCH].items():
+                    if not value[CONF_WHERE].startswith("#"):
+                        _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON][key] = value
+            if COVER in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS]:
+                for key, value in _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][COVER].items():
+                    if not value[CONF_WHERE].startswith("#"):
+                        _rekeyed_data[data[gateway][CONF_MAC]][CONF_PLATFORMS][BUTTON][key] = value
 
-        return _rekeyed_data
-
-
-class MyHomeDeviceSchema(Schema):
-    def __call__(self, data):
-        data = super().__call__(data)
-        _rekeyed_data = {}
-
-        for device in data:
-            data[device][CONF_ENTITIES] = {}
-            if CONF_WHERE in data[device]:
-                _new_key = (
-                    f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}#4#{data[device][CONF_BUS_INTERFACE]}"
-                    if CONF_BUS_INTERFACE in data[device] and data[device][CONF_BUS_INTERFACE] is not None
-                    else f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}"
-                )
-                _rekeyed_data[_new_key] = data[device]
-            elif CONF_ZONE in data[device]:
-                _new_key = f"{data[device][CONF_WHO]}-{data[device][CONF_ZONE]}"
-                data[device][CONF_ZONE] = f"#0#{data[device][CONF_ZONE]}" if data[device][CONF_CENTRAL] and data[device][CONF_ZONE] != "#0" else data[device][CONF_ZONE]
-                data[device][CONF_NAME] = (
-                    data[device][CONF_NAME] if CONF_NAME in data[device] else "Central unit" if data[device][CONF_ZONE].startswith("#0") else f"Zone {data[device][CONF_ZONE]}"
-                )
-                _rekeyed_data[_new_key] = data[device]
-            if CONF_DEVICE_MODEL not in data[device]:
-                data[device][CONF_DEVICE_MODEL] = None
-            if CONF_ICON not in data[device]:
-                data[device][CONF_ICON] = None
-            if CONF_ICON_ON not in data[device]:
-                data[device][CONF_ICON_ON] = None
-            if CONF_ENTITY_NAME not in data[device]:
-                data[device][CONF_ENTITY_NAME] = None
-
-        return _rekeyed_data
+    return _rekeyed_data
 
 
-class MyHomeSensorSchema(Schema):
-    def __call__(self, data):
-        data = super().__call__(data)
-        _rekeyed_data = {}
+def MyHomeConfigSchema(schema):
+    # HA 2026.9 replaced voluptuous with probatio, which compiles nested Schema
+    # objects inline and never calls an overridden __call__. Chain the
+    # post-processing with All() so it runs regardless of the validator backend.
+    return All(Schema(schema), _rekey_config)
 
-        for device in data:
-            data[device][CONF_ENTITIES] = {}
-            if CONF_DEVICE_CLASS in data[device]:
-                if data[device][CONF_DEVICE_CLASS] in [
-                    SensorDeviceClass.POWER,
-                    SensorDeviceClass.ENERGY,
-                ]:
-                    if CONF_WHO not in data[device]:
-                        data[device][CONF_WHO] = "18"
-                    elif data[device][CONF_WHO] != "18":
-                        raise Invalid("invalid sensor class for selected who")
-                    data[device][CONF_ENTITIES][f"daily-{SensorDeviceClass.ENERGY}"] = {}
-                    data[device][CONF_ENTITIES][f"monthly-{SensorDeviceClass.ENERGY}"] = {}
-                    data[device][CONF_ENTITIES][f"total-{SensorDeviceClass.ENERGY}"] = {}
-                    if data[device][CONF_DEVICE_CLASS] in [SensorDeviceClass.POWER]:
-                        data[device][CONF_ENTITIES][f"{SensorDeviceClass.POWER}"] = {}
-                elif data[device][CONF_DEVICE_CLASS] in [SensorDeviceClass.TEMPERATURE]:
-                    if CONF_WHO not in data[device]:
-                        data[device][CONF_WHO] = "4"
-                    elif data[device][CONF_WHO] != "4":
-                        raise Invalid("invalid sensor class for selected who")
-                elif data[device][CONF_DEVICE_CLASS] in [SensorDeviceClass.ILLUMINANCE]:
-                    if CONF_WHO not in data[device]:
-                        data[device][CONF_WHO] = "1"
-                    elif data[device][CONF_WHO] != "1":
-                        raise Invalid("invalid sensor class for selected who")
-            if CONF_WHERE in data[device]:
-                _new_key = (
-                    f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}#4#{data[device][CONF_BUS_INTERFACE]}"
-                    if CONF_BUS_INTERFACE in data[device] and data[device][CONF_BUS_INTERFACE] is not None
-                    else f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}"
-                )
-                _rekeyed_data[_new_key] = data[device]
-            if CONF_DEVICE_MODEL not in data[device]:
-                data[device][CONF_DEVICE_MODEL] = None
 
-        return _rekeyed_data
+def _rekey_devices(data):
+    """Post-process validated data (run via All(), not a Schema.__call__ override)."""
+    _rekeyed_data = {}
+
+    for device in data:
+        data[device][CONF_ENTITIES] = {}
+        if CONF_WHERE in data[device]:
+            _new_key = (
+                f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}#4#{data[device][CONF_BUS_INTERFACE]}"
+                if CONF_BUS_INTERFACE in data[device] and data[device][CONF_BUS_INTERFACE] is not None
+                else f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}"
+            )
+            _rekeyed_data[_new_key] = data[device]
+        elif CONF_ZONE in data[device]:
+            _new_key = f"{data[device][CONF_WHO]}-{data[device][CONF_ZONE]}"
+            data[device][CONF_ZONE] = f"#0#{data[device][CONF_ZONE]}" if data[device][CONF_CENTRAL] and data[device][CONF_ZONE] != "#0" else data[device][CONF_ZONE]
+            data[device][CONF_NAME] = (
+                data[device][CONF_NAME] if CONF_NAME in data[device] else "Central unit" if data[device][CONF_ZONE].startswith("#0") else f"Zone {data[device][CONF_ZONE]}"
+            )
+            _rekeyed_data[_new_key] = data[device]
+        if CONF_DEVICE_MODEL not in data[device]:
+            data[device][CONF_DEVICE_MODEL] = None
+        if CONF_ICON not in data[device]:
+            data[device][CONF_ICON] = None
+        if CONF_ICON_ON not in data[device]:
+            data[device][CONF_ICON_ON] = None
+        if CONF_ENTITY_NAME not in data[device]:
+            data[device][CONF_ENTITY_NAME] = None
+
+    return _rekeyed_data
+
+
+def MyHomeDeviceSchema(schema):
+    # HA 2026.9 replaced voluptuous with probatio, which compiles nested Schema
+    # objects inline and never calls an overridden __call__. Chain the
+    # post-processing with All() so it runs regardless of the validator backend.
+    return All(Schema(schema), _rekey_devices)
+
+
+def _rekey_sensors(data):
+    """Post-process validated data (run via All(), not a Schema.__call__ override)."""
+    _rekeyed_data = {}
+
+    for device in data:
+        data[device][CONF_ENTITIES] = {}
+        if CONF_DEVICE_CLASS in data[device]:
+            if data[device][CONF_DEVICE_CLASS] in [
+                SensorDeviceClass.POWER,
+                SensorDeviceClass.ENERGY,
+            ]:
+                if CONF_WHO not in data[device]:
+                    data[device][CONF_WHO] = "18"
+                elif data[device][CONF_WHO] != "18":
+                    raise Invalid("invalid sensor class for selected who")
+                data[device][CONF_ENTITIES][f"daily-{SensorDeviceClass.ENERGY}"] = {}
+                data[device][CONF_ENTITIES][f"monthly-{SensorDeviceClass.ENERGY}"] = {}
+                data[device][CONF_ENTITIES][f"total-{SensorDeviceClass.ENERGY}"] = {}
+                if data[device][CONF_DEVICE_CLASS] in [SensorDeviceClass.POWER]:
+                    data[device][CONF_ENTITIES][f"{SensorDeviceClass.POWER}"] = {}
+            elif data[device][CONF_DEVICE_CLASS] in [SensorDeviceClass.TEMPERATURE]:
+                if CONF_WHO not in data[device]:
+                    data[device][CONF_WHO] = "4"
+                elif data[device][CONF_WHO] != "4":
+                    raise Invalid("invalid sensor class for selected who")
+            elif data[device][CONF_DEVICE_CLASS] in [SensorDeviceClass.ILLUMINANCE]:
+                if CONF_WHO not in data[device]:
+                    data[device][CONF_WHO] = "1"
+                elif data[device][CONF_WHO] != "1":
+                    raise Invalid("invalid sensor class for selected who")
+        if CONF_WHERE in data[device]:
+            _new_key = (
+                f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}#4#{data[device][CONF_BUS_INTERFACE]}"
+                if CONF_BUS_INTERFACE in data[device] and data[device][CONF_BUS_INTERFACE] is not None
+                else f"{data[device][CONF_WHO]}-{data[device][CONF_WHERE]}"
+            )
+            _rekeyed_data[_new_key] = data[device]
+        if CONF_DEVICE_MODEL not in data[device]:
+            data[device][CONF_DEVICE_MODEL] = None
+
+    return _rekeyed_data
+
+
+def MyHomeSensorSchema(schema):
+    # HA 2026.9 replaced voluptuous with probatio, which compiles nested Schema
+    # objects inline and never calls an overridden __call__. Chain the
+    # post-processing with All() so it runs regardless of the validator backend.
+    return All(Schema(schema), _rekey_sensors)
 
 
 light_schema = MyHomeDeviceSchema(
