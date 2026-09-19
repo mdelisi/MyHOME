@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from .gateway import MyHOMEGatewayHandler
 
 from homeassistant.helpers.entity import Entity
-from homeassistant.const import CONF_ENTITIES
+from homeassistant.const import CONF_ENTITIES, MAJOR_VERSION, MINOR_VERSION
 
 
 from .const import DOMAIN, CONF_PLATFORMS, CONF_ENTITIES
@@ -45,8 +45,12 @@ class MyHOMEEntity(Entity):
             "name": name,
             "manufacturer": self._manufacturer,
             "model": self._model,
-            "via_device": (DOMAIN, self._gateway_handler.unique_id),
         }
+        # HA 2026.8 added `via_device_id` and deprecated `via_device` (removed in 2027.8).
+        if (MAJOR_VERSION, MINOR_VERSION) >= (2026, 8) and gateway.device_registry_id:
+            self._attr_device_info["via_device_id"] = gateway.device_registry_id
+        else:
+            self._attr_device_info["via_device"] = (DOMAIN, self._gateway_handler.unique_id)
 
     async def async_added_to_hass(self):
         """When entity is added to hass."""
